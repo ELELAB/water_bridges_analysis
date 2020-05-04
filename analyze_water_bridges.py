@@ -292,7 +292,7 @@ if __name__ == "__main__":
     elif analysis_type == "residue":
         # water bridges per each pair of residues, 
         # differentiated by order
-        analysis_func = AnalysisFunctions.wb_per_residue_order
+        analysis_func = AnalysisFunctions.wb_per_residue
         cols = \
             ["s1_segid", "s1_resname", "s1_resid", \
              "s2_segid", "s2_resname", "s2_resid", \
