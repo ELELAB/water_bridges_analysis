@@ -35,4 +35,4 @@ Available arguments and options are:
 * `-s2` or `--selection2` followed by the second atom selection, defined according to the MDAnalysis syntax, but with whitespaces replaced by underscores (e.g. `resname ALA` becomes `resname_ALA`).
 * `-sw` or `--water-selection` followed by the water selection, defined according to the MDAnalysis syntax, but with whitespaces replaced by underscores (e.g. `resname SOL` becomes `resname_SOL`). The default is `resname_SOL`.
 * `--forcefield` followed by the  name of the force field from which atom names should be taken. `CHARMM27`, `GLYCAM06` and `CHARMM22ST_PHOSPHO` are currently supported. The default is `CHARMM27`.
-* `--order` followed by the maximum order for a water bridge to be reported. The order of a water bridge is the number of water molecules bridging two atoms. Water bridges of order 0 are simply hydrogen bonds between two atoms. The defaul is `1`. 
+* `--order` followed by the maximum order for a water bridge to be reported. The order of a water bridge is the number of water molecules bridging two atoms. Water bridges of order 0 are simply hydrogen bonds between two atoms. The default is `1`. 
