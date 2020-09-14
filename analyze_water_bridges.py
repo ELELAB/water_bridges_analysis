@@ -25,16 +25,17 @@
 #    along with this program.  
 #    If not, see <http://www.gnu.org/licenses/>.
 
+# standard library
 import argparse
 import sys
-
+# third-party packages
 import MDAnalysis as mda
 from MDAnalysis.analysis.hbonds.wbridge_analysis import WaterBridgeAnalysis
 import pandas as pd
 
 class WaterBridgeAnalysis_Custom(WaterBridgeAnalysis):
     
-    """Class for water bridges analysis including atom
+    """Class for water bridges analysis, including atom
     names for additional forcefields (for CHARMM27 and GLYCAM06
     they are already present in the WaterBridgeAnalysis base
     class, but the attribute cannot be simply updated in
@@ -81,11 +82,12 @@ class AnalysisFunctions:
     have three parameters:
     
     current : `list`
-        List of hydrogen bonds from selection 1 to selection 2.
+        List of hydrogen bonds from the atom selection 1 
+        to the atom selection 2.
     output : `dict`
         A dictionary which is modified in-place where the key
         is the type of water bridge and the value is the weight 
-        of this type of water bridge.
+        of that specific type of water bridge.
     u : `MDAnalysis.universe`
         The current Universe for looking up atoms.
     """
@@ -107,7 +109,7 @@ class AnalysisFunctions:
         sele2 = u.atoms[sele2_index]
         # get the order of the current water bridge
         order_of_wb = len(current) - 1
-        # return water bridge attributes
+        # return the attributes defining the water bridge
         return ((sele1.segid, sele1.resname, sele1.resid, \
                  sele1.name, sele1_index), \
                 (sele2.segid, sele2.resname, sele2.resid, \
@@ -115,7 +117,7 @@ class AnalysisFunctions:
                 order_of_wb)
 
     @staticmethod
-    def wb_per_atom(current, output, u):
+    def count_wb_per_atom(current, output, u):
         """Count the water bridges per atom, differentiating 
         them according to their order.
         """
@@ -134,7 +136,7 @@ class AnalysisFunctions:
 
 
     @staticmethod
-    def wb_per_residue(current, output, u):
+    def count_wb_per_residue(current, output, u):
         """Count the water bridges per residue, differentiating 
         them according to their order (multiple water bridges 
         of the same order between two residues are counted as 
@@ -158,44 +160,46 @@ class AnalysisFunctions:
 
 if __name__ == "__main__":
 
+
+    ######################### ARGUMENT PARSER #########################
+
+
     # create an argument parser
     parser = argparse.ArgumentParser()
 
     # add arguments to the parser
-    f_helpstr = "Name of/path to the input trajectory."
+    f_helpstr = "Input trajectory."
     parser.add_argument("-f", "--traj", \
                         dest = "traj", \
                         type = str, \
                         required = True, \
                         help = f_helpstr)
 
-    s_helpstr = "Name of/path to the input topology."
+    s_helpstr = "Input topology."
     parser.add_argument("-s", "--top", \
                         dest = "top", \
                         type = str, \
                         required = True, \
                         help = s_helpstr)
 
-    o_helpstr = "Name of/path to the output file."
+    o_helpstr = "Output CSV file."
     parser.add_argument("-o", "--output-file", \
                         dest = "output_file", \
                         type = str, \
                         required = True, \
                         help = o_helpstr)
 
-    t_helpstr = \
-        "How to analyze the water bridges found. " \
-        "Choices are: {:s} (default: {:s}). "
     t_choices = ["atom", "residue"]
     t_default = "atom"
+    t_helpstr = \
+        f"How to analyze the water bridges found. Choices are: " \
+        f"{', '.join(t_choices)} (default: {t_default}). "
     parser.add_argument("-t", "--analysis-type", \
                         dest = "analysis_type", \
                         type = str, \
                         choices = t_choices, \
-                        required = False, \
                         default = t_default, \
-                        help = t_helpstr.format(", ".join(t_choices), \
-                                                t_default))
+                        help = t_helpstr)
 
     s1_helpstr = \
         "First selection (MDAnalysis syntax with underscores " \
@@ -215,40 +219,35 @@ if __name__ == "__main__":
                         required = True, \
                         help = s2_helpstr)
 
-    sw_helpstr = \
-        "Water selection (MDAnalysis syntax with underscores " \
-        "instead of spaces) (default: {:s})."
     sw_default = "resname_SOL"
+    sw_helpstr = \
+        f"Water selection (MDAnalysis syntax with underscores " \
+        f"instead of spaces) (default: {sw_default})."
     parser.add_argument("-sw", "--water-selection", \
                         dest = "water_selection", \
                         type = str, \
-                        required = False, \
-                        default = sw_default, \
-                        help = sw_helpstr.format(sw_default))
+                        help = sw_helpstr)
 
-    forcefield_helpstr = \
-        "Force field from which to take atom names. Choices " \
-        "are {:s} (default: {:s})."
     forcefield_choices = ["CHARMM27", "GLYCAM06", "CHARMM22ST_PHOSPHO"]
     forcefield_default = "CHARMM27"
+    forcefield_helpstr = \
+        f"Force field from which to take the atom names. Choices " \
+        f"are {', '.join(forcefield_choices)} (default: " \
+        f"{forcefield_default})."
     parser.add_argument("--forcefield", \
                         dest = "forcefield", \
                         type = str, \
                         default = forcefield_default, \
-                        required = False, \
-                        help = forcefield_helpstr.format(\
-                                ", ".join(forcefield_choices), \
-                                forcefield_default))
+                        help = forcefield_helpstr)
 
     order_default = 1
     order_helpstr = \
-        "Maximum water bridge order (default: {:d})."
+        f"Maximum water bridge order (default: {order_default})."
     parser.add_argument("--order", \
                         dest = "order", \
                         type = int, \
                         default = order_default, \
-                        required = False, \
-                        help = order_helpstr.format(order_default))
+                        help = order_helpstr)
 
     # parse the arguments
     args = parser.parse_args()
@@ -261,7 +260,11 @@ if __name__ == "__main__":
     water_selection = args.water_selection.replace("_", " ")
     forcefield = args.forcefield
     order = args.order
-    
+
+
+    ############################# ANALYSIS ############################
+
+
     # create the Universe
     u = mda.Universe(top, traj)
     
@@ -281,7 +284,7 @@ if __name__ == "__main__":
     if analysis_type == "atom":
         # default counting, each water bridge treated
         # separately.
-        analysis_func = AnalysisFunctions.wb_per_atom
+        analysis_func = AnalysisFunctions.count_wb_per_atom
         cols = \
             ["s1_segid", "s1_resname", "s1_resid", \
              "s1_name", "s1_index", \
@@ -292,7 +295,7 @@ if __name__ == "__main__":
     elif analysis_type == "residue":
         # water bridges per each pair of residues, 
         # differentiated by order
-        analysis_func = AnalysisFunctions.wb_per_residue
+        analysis_func = AnalysisFunctions.count_wb_per_residue
         cols = \
             ["s1_segid", "s1_resname", "s1_resid", \
              "s2_segid", "s2_resname", "s2_resid", \
@@ -302,9 +305,7 @@ if __name__ == "__main__":
     # criteria
     wb_count = analysis.count_by_type(analysis_func = analysis_func)  
     
-    # convert each item of the list into a flattened tuple (just
-    # leave the tuple as it is if the first item is not a tuple, as
-    # it happens when the default counting is used).
+    # convert each item of the list into a flattened tuple
     wb_count_flat = [(*item[0], *item[1:]) for item in wb_count]
     
     # convert the output to a dataframe
@@ -319,7 +320,7 @@ if __name__ == "__main__":
                    ascending = sort_ascending, \
                    inplace = True)
     
-    # save the output to a CSV file
+    # save the results to the output CSV file
     df.to_csv(output_file, \
               sep = ",", \
               float_format = "%.5f", \
