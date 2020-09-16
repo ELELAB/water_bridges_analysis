@@ -118,7 +118,7 @@ class AnalysisFunctions:
                 order_of_wb)
 
     @staticmethod
-    def count_wb_per_atom(current, output, u):
+    def count_per_atom(current, output, u):
         """Count the water bridges per atom, differentiating 
         them according to their order.
         """
@@ -137,7 +137,7 @@ class AnalysisFunctions:
 
 
     @staticmethod
-    def count_wb_per_residue(current, output, u):
+    def count_per_residue(current, output, u):
         """Count the water bridges per residue, differentiating 
         them according to their order (multiple water bridges 
         of the same order between two residues are counted as 
@@ -189,18 +189,18 @@ if __name__ == "__main__":
                         nargs = "+", \
                         help = o_helpstr)
 
-    t_choices = ["atom", "residue"]
-    t_helpstr = \
+    a_choices = ["count_per_atom", "count_per_residue"]
+    a_helpstr = \
         f"How to analyze the water bridges found. Choices are: " \
-        f"{', '.join(t_choices)}. You can select more than one " \
+        f"{', '.join(a_choices)}. You can select more than one " \
         f"analysis at once (remember to pass as many output " \
         f"files as the number of analyses requested)."
-    parser.add_argument("-t", "--analysis-types", \
+    parser.add_argument("-a", "--analyses", \
                         type = str, \
-                        choices = t_choices, \
+                        choices = a_choices, \
                         nargs = "+", \
                         required = True, \
-                        help = t_helpstr)
+                        help = a_helpstr)
 
     s1_helpstr = \
         "First selection (MDAnalysis syntax with underscores " \
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     top = args.top
     traj = args.traj
     output_files = args.output_files
-    analysis_types = args.analysis_types
+    analyses = args.analyses
     selection1 = args.selection1.replace("_", " ")
     selection2 = args.selection2.replace("_", " ")
     water_selection = args.water_selection.replace("_", " ")
@@ -283,8 +283,8 @@ if __name__ == "__main__":
 
     # check that the number of output files passed corresponds to the
     # number of analyses requested
-    if len(analysis_types) != len(output_files):
-        errstr = f"You passed {len(analysis_types)} analysis types " \
+    if len(analyses) != len(output_files):
+        errstr = f"You passed {len(analyses)} analysis types " \
                  f"to be performed but provided {len(output_files)} " \
                  f"output files to store their results."
         # log the error to the user
@@ -300,7 +300,7 @@ if __name__ == "__main__":
     u = mda.Universe(top, traj)
     
     # set up the water bridges analyis
-    analysis = \
+    wb_analysis = \
         WaterBridgeAnalysis_Custom(universe = u, \
                                    selection1 = selection1, \
                                    selection2 = selection2, \
@@ -310,15 +310,15 @@ if __name__ == "__main__":
                                    debug = debug)
     
     # run the analysis
-    analysis.run()
+    wb_analysis.run()
     
     # for each analysis requested
-    for analysis_type, output_file in zip(analysis_types, output_files):
+    for analysis, output_file in zip(analyses, output_files):
         # analyze the water bridges found
-        if analysis_type == "atom":
+        if analysis == "count_per_atom":
             # default counting, each water bridge treated
             # separately.
-            analysis_func = AnalysisFunctions.count_wb_per_atom
+            analysis_func = AnalysisFunctions.count_per_atom
             cols = \
                 ["s1_segid", "s1_resname", "s1_resid", \
                  "s1_name", "s1_index", \
@@ -326,10 +326,10 @@ if __name__ == "__main__":
                  "s2_name", "s2_index", \
                  "order_of_wb", "persistence"]
         
-        elif analysis_type == "residue":
+        elif analysis == "count_per_residue":
             # water bridges per each pair of residues, 
             # differentiated by order
-            analysis_func = AnalysisFunctions.count_wb_per_residue
+            analysis_func = AnalysisFunctions.count_per_residue
             cols = \
                 ["s1_segid", "s1_resname", "s1_resid", \
                  "s2_segid", "s2_resname", "s2_resid", \
@@ -337,7 +337,8 @@ if __name__ == "__main__":
 
         # count the water bridges by type according to the selected
         # criteria
-        wb_count = analysis.count_by_type(analysis_func = analysis_func) 
+        wb_count = \
+            wb_analysis.count_by_type(analysis_func = analysis_func) 
         
         # convert each item of the list into a flattened tuple
         wb_count_flat = [(*item[0], *item[1:]) for item in wb_count]
