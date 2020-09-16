@@ -27,6 +27,7 @@
 
 # standard library
 import argparse
+import logging
 import sys
 # third-party packages
 import MDAnalysis as mda
@@ -170,42 +171,41 @@ if __name__ == "__main__":
     # add arguments to the parser
     f_helpstr = "Input trajectory."
     parser.add_argument("-f", "--traj", \
-                        dest = "traj", \
                         type = str, \
                         required = True, \
                         help = f_helpstr)
 
     s_helpstr = "Input topology."
     parser.add_argument("-s", "--top", \
-                        dest = "top", \
                         type = str, \
                         required = True, \
                         help = s_helpstr)
 
-    o_helpstr = "Output CSV file."
-    parser.add_argument("-o", "--output-file", \
-                        dest = "output_file", \
+    o_helpstr = "Output CSV file(s). Pass more than one output " \
+                "file if you select more than one analysis type."
+    parser.add_argument("-o", "--output-files", \
                         type = str, \
                         required = True, \
+                        nargs = "+", \
                         help = o_helpstr)
 
     t_choices = ["atom", "residue"]
-    t_default = "atom"
     t_helpstr = \
         f"How to analyze the water bridges found. Choices are: " \
-        f"{', '.join(t_choices)} (default: {t_default}). "
-    parser.add_argument("-t", "--analysis-type", \
-                        dest = "analysis_type", \
+        f"{', '.join(t_choices)}. You can select more than one " \
+        f"analysis at once (remember to pass as many output " \
+        f"files as the number of analyses requested)."
+    parser.add_argument("-t", "--analysis-types", \
                         type = str, \
                         choices = t_choices, \
-                        default = t_default, \
+                        nargs = "+", \
+                        required = True, \
                         help = t_helpstr)
 
     s1_helpstr = \
         "First selection (MDAnalysis syntax with underscores " \
         "instead of spaces)."
     parser.add_argument("-s1", "--selection1", \
-                        dest = "selection1", \
                         type = str, \
                         required = True, \
                         help = s1_helpstr)
@@ -214,7 +214,6 @@ if __name__ == "__main__":
         "Second selection (MDAnalysis syntax with underscores " \
         "instead of spaces)."
     parser.add_argument("-s2", "--selection2", \
-                        dest = "selection2", \
                         type = str, \
                         required = True, \
                         help = s2_helpstr)
@@ -224,7 +223,6 @@ if __name__ == "__main__":
         f"Water selection (MDAnalysis syntax with underscores " \
         f"instead of spaces) (default: {sw_default})."
     parser.add_argument("-sw", "--water-selection", \
-                        dest = "water_selection", \
                         type = str, \
                         help = sw_helpstr)
 
@@ -235,7 +233,6 @@ if __name__ == "__main__":
         f"are {', '.join(forcefield_choices)} (default: " \
         f"{forcefield_default})."
     parser.add_argument("--forcefield", \
-                        dest = "forcefield", \
                         type = str, \
                         default = forcefield_default, \
                         help = forcefield_helpstr)
@@ -244,22 +241,56 @@ if __name__ == "__main__":
     order_helpstr = \
         f"Maximum water bridge order (default: {order_default})."
     parser.add_argument("--order", \
-                        dest = "order", \
                         type = int, \
                         default = order_default, \
                         help = order_helpstr)
+
+    v_helpstr = f"Logging level: INFO."
+    parser.add_argument("-v", \
+                        action = "store_true", \
+                        help = v_helpstr)
+
+    vv_helpstr = f"Logging level: DEBUG."
+    parser.add_argument("-vv", \
+                        action = "store_true", \
+                        help = vv_helpstr)
 
     # parse the arguments
     args = parser.parse_args()
     top = args.top
     traj = args.traj
-    output_file = args.output_file
-    analysis_type = args.analysis_type
+    output_files = args.output_files
+    analysis_types = args.analysis_types
     selection1 = args.selection1.replace("_", " ")
     selection2 = args.selection2.replace("_", " ")
     water_selection = args.water_selection.replace("_", " ")
     forcefield = args.forcefield
     order = args.order
+    v = args.v
+    vv = args.vv
+
+    # set the logging level for the script and switch the debug
+    # mode of the WaterBridgeAnalysis on/off
+    level = logging.WARNING
+    debug = False
+    if v:
+        level = logging.INFO
+    if vv:
+        level = logging.DEBUG
+        debug = True
+    # configure the logging
+    logging.basicConfig(level = level)
+
+    # check that the number of output files passed corresponds to the
+    # number of analyses requested
+    if len(analysis_types) != len(output_files):
+        errstr = f"You passed {len(analysis_types)} analysis types " \
+                 f"to be performed but provided {len(output_files)} " \
+                 f"output files to store their results."
+        # log the error to the user
+        logging.error(errstr)
+        # exit
+        exit(1)
 
 
     ############################# ANALYSIS ############################
@@ -275,53 +306,56 @@ if __name__ == "__main__":
                                    selection2 = selection2, \
                                    water_selection = water_selection, \
                                    forcefield = forcefield, \
-                                   order = order)
+                                   order = order, \
+                                   debug = debug)
     
     # run the analysis
     analysis.run()
     
-    # analyze the water bridges found
-    if analysis_type == "atom":
-        # default counting, each water bridge treated
-        # separately.
-        analysis_func = AnalysisFunctions.count_wb_per_atom
-        cols = \
-            ["s1_segid", "s1_resname", "s1_resid", \
-             "s1_name", "s1_index", \
-             "s2_segid", "s2_resname", "s2_resid", \
-             "s2_name", "s2_index", \
-             "order_of_wb", "persistence"]
-    
-    elif analysis_type == "residue":
-        # water bridges per each pair of residues, 
-        # differentiated by order
-        analysis_func = AnalysisFunctions.count_wb_per_residue
-        cols = \
-            ["s1_segid", "s1_resname", "s1_resid", \
-             "s2_segid", "s2_resname", "s2_resid", \
-             "order_of_wb", "persistence"]
+    # for each analysis requested
+    for analysis_type, output_file in zip(analysis_types, output_files):
+        # analyze the water bridges found
+        if analysis_type == "atom":
+            # default counting, each water bridge treated
+            # separately.
+            analysis_func = AnalysisFunctions.count_wb_per_atom
+            cols = \
+                ["s1_segid", "s1_resname", "s1_resid", \
+                 "s1_name", "s1_index", \
+                 "s2_segid", "s2_resname", "s2_resid", \
+                 "s2_name", "s2_index", \
+                 "order_of_wb", "persistence"]
+        
+        elif analysis_type == "residue":
+            # water bridges per each pair of residues, 
+            # differentiated by order
+            analysis_func = AnalysisFunctions.count_wb_per_residue
+            cols = \
+                ["s1_segid", "s1_resname", "s1_resid", \
+                 "s2_segid", "s2_resname", "s2_resid", \
+                 "order_of_wb", "persistence"]
 
-    # count the water bridges by type according to the selected
-    # criteria
-    wb_count = analysis.count_by_type(analysis_func = analysis_func)  
-    
-    # convert each item of the list into a flattened tuple
-    wb_count_flat = [(*item[0], *item[1:]) for item in wb_count]
-    
-    # convert the output to a dataframe
-    df = pd.DataFrame(data = wb_count_flat, \
-                      columns = cols)
-    
-    # sort the water bridges by increasing order and decreasing
-    # persistence (more persistent water bridges will come first)
-    sort_keys = ["order_of_wb", "persistence"]
-    sort_ascending = [True, False]
-    df.sort_values(by = sort_keys, \
-                   ascending = sort_ascending, \
-                   inplace = True)
-    
-    # save the results to the output CSV file
-    df.to_csv(output_file, \
-              sep = ",", \
-              float_format = "%.5f", \
-              index = False)
+        # count the water bridges by type according to the selected
+        # criteria
+        wb_count = analysis.count_by_type(analysis_func = analysis_func) 
+        
+        # convert each item of the list into a flattened tuple
+        wb_count_flat = [(*item[0], *item[1:]) for item in wb_count]
+        
+        # convert the output to a dataframe
+        df = pd.DataFrame(data = wb_count_flat, \
+                          columns = cols)
+        
+        # sort the water bridges by increasing order and decreasing
+        # persistence (more persistent water bridges will come first)
+        sort_keys = ["order_of_wb", "persistence"]
+        sort_ascending = [True, False]
+        df.sort_values(by = sort_keys, \
+                       ascending = sort_ascending, \
+                       inplace = True)
+        
+        # save the results to the output CSV file
+        df.to_csv(output_file, \
+                  sep = ",", \
+                  float_format = "%.5f", \
+                  index = False)
