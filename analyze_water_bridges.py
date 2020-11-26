@@ -25,6 +25,8 @@
 #    along with this program.  
 #    If not, see <http://www.gnu.org/licenses/>.
 
+
+
 # standard library
 import argparse
 import logging
@@ -33,6 +35,8 @@ import sys
 import MDAnalysis as mda
 from MDAnalysis.analysis.hbonds.wbridge_analysis import WaterBridgeAnalysis
 import pandas as pd
+
+
 
 class WaterBridgeAnalysis_Custom(WaterBridgeAnalysis):
     
@@ -132,7 +136,7 @@ class AnalysisFunctions:
         key = (s1_segid, s1_resname, s1_resid, s1_name, s1_index, \
                s2_segid, s2_resname, s2_resid, s2_name, s2_index, \
                order_of_wb)
-        # Update the count
+        # update the count
         output[key] += 1
 
 
@@ -155,8 +159,8 @@ class AnalysisFunctions:
         key = (s1_segid, s1_resname, s1_resid, \
                s2_segid, s2_resname, s2_resid, \
                order_of_wb)
-        # Update the count
-        output[key] += 1
+        # update the count (count once per frame)
+        output[key] = 1
 
 
 if __name__ == "__main__":
